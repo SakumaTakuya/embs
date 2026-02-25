@@ -20,28 +20,41 @@ class PageConfig:
     include_descendants: bool = False
 
 
-def load_page_configs(config_path: Path) -> list[PageConfig]:
-    """JSONファイルからページ設定を読み込む
+@dataclass
+class ConfluenceConfig:
+    """Confluence取得の設定"""
+
+    space: str | None = None
+    pages: list[PageConfig] | None = None
+
+
+def load_confluence_config(config_path: Path) -> ConfluenceConfig:
+    """JSONファイルからConfluence取得設定を読み込む
 
     JSON format::
 
         {
+          "space": "ENG",
           "pages": [
             {"page_id": "12345", "include_descendants": true},
             {"page_id": "67890"}
           ]
         }
+
+    ``space`` と ``pages`` は両方指定可能。少なくとも一方が必要。
     """
     with open(config_path, encoding="utf-8") as f:
         data = json.load(f)
 
-    return [
+    pages = [
         PageConfig(
             page_id=str(p["page_id"]),
             include_descendants=p.get("include_descendants", False),
         )
-        for p in data["pages"]
-    ]
+        for p in data.get("pages", [])
+    ] or None
+
+    return ConfluenceConfig(space=data.get("space"), pages=pages)
 
 
 def _sanitize_filename(name: str) -> str:
@@ -74,14 +87,26 @@ class ConfluenceFetcher(BaseFetcher):
         confluence = Confluence(url=self.url, token=self.token)
         converter = DocumentConverter()
 
-        if self.page_configs:
-            pages = self._collect_pages_by_config(confluence)
-        else:
-            pages = confluence.get_all_pages_from_space(
+        pages: list[dict] = []
+        seen_ids: set[str] = set()
+
+        if self.space_key:
+            for p in confluence.get_all_pages_from_space(
                 self.space_key,
                 expand="body.storage",
                 limit=100,
-            )
+            ):
+                pid = str(p["id"])
+                if pid not in seen_ids:
+                    pages.append(p)
+                    seen_ids.add(pid)
+
+        if self.page_configs:
+            for p in self._collect_pages_by_config(confluence):
+                pid = str(p["id"])
+                if pid not in seen_ids:
+                    pages.append(p)
+                    seen_ids.add(pid)
 
         saved: list[Path] = []
         for page in pages:
