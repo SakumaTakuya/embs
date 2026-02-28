@@ -56,35 +56,11 @@ class ConfluenceFetcher(BaseFetcher):
         *,
         url: str | None = None,
         token: str | None = None,
-        space_key: str | None = None,
     ) -> None:
         self.url = url or os.environ["CONFLUENCE_URL"]
         self.token = token or os.environ["CONFLUENCE_TOKEN"]
-        self.space_key = space_key or os.environ.get("CONFLUENCE_SPACE_KEY", "")
 
-    def fetch(self, out_dir: Path) -> list[Path]:
-        """スペース内の全ページを取得する（従来の動作）"""
-        if not self.space_key:
-            raise ValueError("space_key が必要です")
-
-        out_dir.mkdir(parents=True, exist_ok=True)
-
-        confluence = Confluence(url=self.url, token=self.token)
-        converter = DocumentConverter()
-
-        pages = confluence.get_all_pages_from_space(
-            self.space_key,
-            expand="body.storage",
-            limit=100,
-        )
-
-        saved: list[Path] = []
-        for page in pages:
-            self._save_page(page, converter, out_dir, saved)
-
-        return saved
-
-    def fetch_pages(self, out_dir: Path, config: ConfluenceConfig) -> list[Path]:
+    def fetch(self, out_dir: Path, config: ConfluenceConfig) -> list[Path]:
         """設定ファイルに基づいて特定ページを取得する"""
         out_dir.mkdir(parents=True, exist_ok=True)
 
