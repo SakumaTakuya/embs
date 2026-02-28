@@ -11,16 +11,28 @@ app.add_typer(fetch_app, name="fetch")
 
 @fetch_app.command("confluence")
 def fetch_confluence(
-    space: str = typer.Option(..., "--space", help="Confluence space key"),
+    space: str | None = typer.Option(None, "--space", help="Confluence space key"),
+    config: Path | None = typer.Option(None, "--config", help="設定ファイルパス (JSON)"),
     out: Path = typer.Option(..., "--out", help="出力ディレクトリ"),
 ) -> None:
-    """ConfluenceスペースからMarkdownファイルを取得する"""
-    import os
+    """Confluenceからページを取得してMarkdownに変換する
 
-    from embs.fetchers.confluence import ConfluenceFetcher
+    --config で設定ファイルを指定すると特定ページのみ取得します。
+    --space でスペース全体を取得します（従来の動作）。
+    """
+    from embs.fetchers.confluence import ConfluenceFetcher, load_config
 
-    fetcher = ConfluenceFetcher(space_key=space)
-    files = fetcher.fetch(out)
+    if config is not None:
+        cfg = load_config(config)
+        fetcher = ConfluenceFetcher(space_key=cfg.space_key)
+        files = fetcher.fetch_pages(out, cfg)
+    elif space is not None:
+        fetcher = ConfluenceFetcher(space_key=space)
+        files = fetcher.fetch(out)
+    else:
+        typer.echo("--space または --config のいずれかを指定してください", err=True)
+        raise typer.Exit(1)
+
     typer.echo(f"{len(files)} ファイルを取得しました → {out}")
 
 
