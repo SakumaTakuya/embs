@@ -11,6 +11,11 @@ dependencies = [
     "atlassian-python-api",
 ]
 
+[project.optional-dependencies]
+test = [
+    "pytest",
+]
+
 [project.scripts]
 embs = "embs.cli:app"
 
